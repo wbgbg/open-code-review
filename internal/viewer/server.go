@@ -10,10 +10,13 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alibaba/open-code-review/internal/session"
 )
 
 //go:embed templates/*.html static/style.css static/pager.js static/a11y.js static/session.js static/repos.js static/sessions.js static/icons/*.svg
@@ -46,6 +49,14 @@ func StartServer(addr, openMode string) error {
 	root, err := SessionsRoot()
 	if err != nil {
 		return fmt.Errorf("resolve sessions root: %w", err)
+	}
+
+	// Download sessions recorded on other machines before the first page is
+	// served, so the viewer shows the whole configured store and not just this
+	// machine's cache. A failed download is reported and the viewer still serves
+	// what is local.
+	if err := session.RefreshFromStore(); err != nil {
+		fmt.Fprintf(os.Stderr, "[ocr viewer] warning: download sessions from the configured store: %v (showing the local cache only)\n", err)
 	}
 
 	mux := newMux(root)
